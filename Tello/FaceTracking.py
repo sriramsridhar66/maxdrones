@@ -10,13 +10,15 @@ print(drone.get_battery())
 
 drone.streamon()
 drone.takeoff()
-drone.send_rc_control(0, 0, 25, 0) #allow drone to reach face level
-time.sleep(2.7) #time for drone to ascend
+# drone.send_rc_control(0, 0, 25, 0) #allow drone to reach face level
+# time.sleep(2.7) #time for drone to ascend
+drone.move_up(85)
 
-w, h  = 360, 240
+w, h  = 360, 480
 fbRange = [6200, 6800]
 pid = [0.4, 0.4, 0]
 ud_pError = 0
+fb_pError = 0
 yaw_pError = 0
 
 def findFace(img):
@@ -41,40 +43,46 @@ def findFace(img):
     else:
         return img, [[0, 0], 0]
 
-def trackFace(info, w, pid, ud_pError, yaw_pError):
+def trackFace(info, w, pid, ud_pError, fb_pError, yaw_pError):
     area = info[1]
     x, y = info[0]
     fb = 0
 
     ud_error = y - h // 2
     ud_speed = pid[0] * ud_error + pid[1] * (ud_error - ud_pError)
-    ud_speed = int(np.clip(ud_speed, -100, 100))
+    ud_speed = -1*int(np.clip(ud_speed, -100, 100))
+
+    fb_error = area - fbRange[0]
+    fb_speed = pid[0] * fb_error + pid[1] * (fb_error - fb_pError)
+    fb_speed = -1*int(np.clip(fb_speed, -20, 20))
 
     yaw_error = x - w//2
     yaw_speed = pid[0]*yaw_error + pid[1]*(yaw_error - yaw_pError)
     yaw_speed = int(np.clip(yaw_speed, -100, 100))
 
-    if area > fbRange[0] and area < fbRange[1]:
-        fb = 0 #drone will not move if at the desired range
-    elif area == 0:
-        fb = 0 #stop moving if no image
-        speed = 0
-    elif area > fbRange[1]:
-        fb = -8 #if too close, move backward
-    elif area < fbRange[0] and area != 0:
-        fb = 8 #if too far, move forward
+    # if area > fbRange[0] and area < fbRange[1]:
+    #     fb = 0 #drone will not move if at the desired range
+    # elif area == 0:
+    #     fb = 0 #stop moving if no image
+    #     speed = 0
+    # elif area > fbRange[1]:
+    #     fb = -8 #if too close, move backward
+    # elif area < fbRange[0] and area != 0:
+    #     fb = 8 #if too far, move forward
 
     if x == 0:
         yaw_speed = 0
         yaw_error = 0
         ud_speed = 0
         ud_error = 0
+        fb_speed = 0
+        fb_error = 0
 
     #print(speed, fb)
 
-    drone.send_rc_control(0, fb, ud_speed, yaw_speed)
+    drone.send_rc_control(0, fb_speed, ud_speed, yaw_speed)
 
-    return ud_error, yaw_error
+    return ud_error, fb_error, yaw_error
 
 #cap = cv2.VideoCapture(0)
 while True:
@@ -82,7 +90,7 @@ while True:
     img = drone.get_frame_read().frame
     img = cv2.resize(img, (w, h))
     img, info = findFace(img)
-    ud_pError, yaw_pError = trackFace(info, w, pid, ud_pError, yaw_pError)
+    ud_pError, fb_pError, yaw_pError = trackFace(info, w, pid, ud_pError, fb_pError, yaw_pError)
     #print("Center", info[0], "Area", info[1])
     cv2.imshow("Output", img)
     if cv2.waitKey(1) & 0xFF == ord('q'):
