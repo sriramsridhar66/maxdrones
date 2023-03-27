@@ -16,7 +16,8 @@ time.sleep(2.7) #time for drone to ascend
 w, h  = 360, 240
 fbRange = [6200, 6800]
 pid = [0.4, 0.4, 0]
-pError = 0
+ud_pError = 0
+yaw_pError = 0
 
 def findFace(img):
     faceCascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
@@ -40,33 +41,40 @@ def findFace(img):
     else:
         return img, [[0, 0], 0]
 
-def trackFace(info, w, pid, pError):
+def trackFace(info, w, pid, ud_pError, yaw_pError):
     area = info[1]
     x, y = info[0]
     fb = 0
 
-    error = x - w//2
-    speed = pid[0]*error + pid[1]*(error - pError)
-    speed = int(np.clip(speed, -100, 100))
+    ud_error = y - h // 2
+    ud_speed = pid[0] * ud_error + pid[1] * (ud_error - ud_pError)
+    ud_speed = int(np.clip(ud_speed, -100, 100))
+
+    yaw_error = x - w//2
+    yaw_speed = pid[0]*yaw_error + pid[1]*(yaw_error - yaw_pError)
+    yaw_speed = int(np.clip(yaw_speed, -100, 100))
 
     if area > fbRange[0] and area < fbRange[1]:
         fb = 0 #drone will not move if at the desired range
     elif area == 0:
         fb = 0 #stop moving if no image
+        speed = 0
     elif area > fbRange[1]:
-        fb = -20 #if too close, move backward
+        fb = -8 #if too close, move backward
     elif area < fbRange[0] and area != 0:
-        fb = 20 #if too far, move forward
+        fb = 8 #if too far, move forward
 
     if x == 0:
-        speed = 0
-        error = 0
+        yaw_speed = 0
+        yaw_error = 0
+        ud_speed = 0
+        ud_error = 0
 
     #print(speed, fb)
 
-    drone.send_rc_control(0, fb, 0, speed)
+    drone.send_rc_control(0, fb, ud_speed, yaw_speed)
 
-    return error
+    return ud_error, yaw_error
 
 #cap = cv2.VideoCapture(0)
 while True:
@@ -74,7 +82,7 @@ while True:
     img = drone.get_frame_read().frame
     img = cv2.resize(img, (w, h))
     img, info = findFace(img)
-    pError = trackFace(info, w, pid, pError)
+    ud_pError, yaw_pError = trackFace(info, w, pid, ud_pError, yaw_pError)
     #print("Center", info[0], "Area", info[1])
     cv2.imshow("Output", img)
     if cv2.waitKey(1) & 0xFF == ord('q'):
