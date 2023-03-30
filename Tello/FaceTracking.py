@@ -14,7 +14,7 @@ drone.takeoff()
 # time.sleep(2.7) #time for drone to ascend
 drone.move_up(85)
 
-w, h  = 360, 480
+w, h  = 480, 360
 fbRange = [6200, 6800]
 pid = [0.4, 0.4, 0]
 ud_pError = 0
