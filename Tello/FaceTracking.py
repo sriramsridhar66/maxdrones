@@ -3,6 +3,7 @@ import numpy as np
 from djitellopy import tello
 import time
 #import cv2.cv2 as cv2
+from simple_pid import PID
 
 drone = tello.Tello()
 drone.connect()
@@ -12,11 +13,16 @@ drone.streamon()
 drone.takeoff()
 # drone.send_rc_control(0, 0, 25, 0) #allow drone to reach face level
 # time.sleep(2.7) #time for drone to ascend
-drone.move_up(85)
+drone.move_up(100)
 
-w, h  = 480, 360
-fbRange = [6200, 6800]
+w, h  = 360, 240
+fbRange = [5000, 6800]
 pid = [0.4, 0.4, 0]
+pid_fb = PID(0.005, 0.005, 0.005, setpoint=5000)
+pid_fb.output_limits = (-15, 15)
+
+
+
 ud_pError = 0
 fb_pError = 0
 yaw_pError = 0
@@ -48,17 +54,30 @@ def trackFace(info, w, pid, ud_pError, fb_pError, yaw_pError):
     x, y = info[0]
     fb = 0
 
-    ud_error = y - h // 2
-    ud_speed = pid[0] * ud_error + pid[1] * (ud_error - ud_pError)
-    ud_speed = -1*int(np.clip(ud_speed, -100, 100))
+    if x == 0:
+        yaw_speed = 0
+        yaw_error = 0
+        ud_speed = 0
+        ud_error = 0
+        fb_speed = 0
+        fb_error = 0
 
+        drone.send_rc_control(0, 0, 0, 0)
+
+        return 0, 0, 0
+
+    ud_error = y - h // 2
+    # ud_speed = pid[0] * ud_error + pid[1] * (ud_error - ud_pError)
+    # ud_speed = -1*int(np.clip(ud_speed, -100, 100))
+
+    fb_speed = pid_fb(area)
     fb_error = area - fbRange[0]
-    fb_speed = pid[0] * fb_error + pid[1] * (fb_error - fb_pError)
-    fb_speed = -1*int(np.clip(fb_speed, -20, 20))
+    #fb_speed = pid[0] * fb_error + pid[1] * (fb_error - fb_pError)
+    #fb_speed = -1*int(np.clip(fb_speed, -15, 15))
 
     yaw_error = x - w//2
-    yaw_speed = pid[0]*yaw_error + pid[1]*(yaw_error - yaw_pError)
-    yaw_speed = int(np.clip(yaw_speed, -100, 100))
+    # yaw_speed = pid[0]*yaw_error + pid[1]*(yaw_error - yaw_pError)
+    # yaw_speed = int(np.clip(yaw_speed, -100, 100))
 
     # if area > fbRange[0] and area < fbRange[1]:
     #     fb = 0 #drone will not move if at the desired range
@@ -70,19 +89,11 @@ def trackFace(info, w, pid, ud_pError, fb_pError, yaw_pError):
     # elif area < fbRange[0] and area != 0:
     #     fb = 8 #if too far, move forward
 
-    if x == 0:
-        yaw_speed = 0
-        yaw_error = 0
-        ud_speed = 0
-        ud_error = 0
-        fb_speed = 0
-        fb_error = 0
-
     #print(speed, fb)
 
-    drone.send_rc_control(0, fb_speed, ud_speed, yaw_speed)
+    drone.send_rc_control(0, int(fb_speed), 0, 0)
 
-    return ud_error, fb_error, yaw_error
+    return 0, fb_error, 0
 
 #cap = cv2.VideoCapture(0)
 while True:
