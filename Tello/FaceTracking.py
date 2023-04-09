@@ -9,6 +9,7 @@ drone = tello.Tello()
 drone.connect()
 print(drone.get_battery())
 
+#drone.set_video_direction(1)
 drone.streamon()
 drone.takeoff()
 # drone.send_rc_control(0, 0, 25, 0) #allow drone to reach face level
@@ -18,7 +19,11 @@ drone.move_up(100)
 w, h  = 360, 240
 fbRange = [5000, 6800]
 pid = [0.4, 0.4, 0]
-pid_fb = PID(0.005, 0.005, 0.005, setpoint=5000)
+pid_fb = PID(0.005, 0.005, 0.005, setpoint=2500)
+pid_yaw = PID(0.005, 0.005, 0.005, setpoint=(w/2))
+#pid_ud = PID(0.005, 0.005, 0.005, setpoint=(w/2))
+
+pid_yaw.output_limits = (-100, 100)
 pid_fb.output_limits = (-15, 15)
 
 
@@ -72,6 +77,9 @@ def trackFace(info, w, pid, ud_pError, fb_pError, yaw_pError):
 
     fb_speed = pid_fb(area)
     fb_error = area - fbRange[0]
+
+    yaw_speed = pid_yaw(x)
+
     #fb_speed = pid[0] * fb_error + pid[1] * (fb_error - fb_pError)
     #fb_speed = -1*int(np.clip(fb_speed, -15, 15))
 
@@ -91,7 +99,7 @@ def trackFace(info, w, pid, ud_pError, fb_pError, yaw_pError):
 
     #print(speed, fb)
 
-    drone.send_rc_control(0, int(fb_speed), 0, 0)
+    drone.send_rc_control(0, 0, 0, -int(yaw_speed))
 
     return 0, fb_error, 0
 
